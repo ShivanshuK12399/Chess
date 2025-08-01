@@ -5,13 +5,13 @@ namespace Chess.Scripts.Core
 {
     public class ChessPlayerPlacementHandler : MonoBehaviour 
     {
-        [SerializeField] private chessPieceType piece;
+        [SerializeField] private ChessPieceType piece;
         [SerializeField] private int row, column;
         
         public Vector2Int currentTileIndex;
         public bool isWhite;
 
-        enum chessPieceType 
+        public enum ChessPieceType 
         {
             None, Pawn, Knight, Bishop, Rook, Queen, King
         }
@@ -34,36 +34,14 @@ namespace Chess.Scripts.Core
 
         public void OnPieceClicked()
         {
-            switch (piece)
+            var validMoves = PieceMovementHandler.GetValidMoves(piece, currentTileIndex, isWhite);
+
+            foreach (var move in validMoves)
             {
-                case chessPieceType.None:
-                    break;
-
-                case chessPieceType.Pawn:
-                    PawnMoves();
-                    break;
-
-                case chessPieceType.Knight:
-                    KnightMoves();
-                    break;
-
-                case chessPieceType.Bishop:
-                    BishopMoves();
-                    break;
-
-                case chessPieceType.Rook:
-                    RookMoves();
-                    break;
-
-                case chessPieceType.Queen:
-                    QueenMoves();
-                    break;
-
-                case chessPieceType.King:
-                    KingMoves();
-                    break;
+                TryHighlight(move.x, move.y);
             }
         }
+
 
         #region Moves
 
