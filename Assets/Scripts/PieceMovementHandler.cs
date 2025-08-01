@@ -1,189 +1,218 @@
 using Chess.Scripts.Core;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 using static Chess.Scripts.Core.ChessPlayerPlacementHandler;
 
-public static class PieceMovementHandler
+public class PieceMovementHandler:MonoBehaviour
 {
-    public static List<Vector2Int> GetValidMoves(ChessPieceType pieceType, Vector2Int pos, bool isWhite)
+    public static PieceMovementHandler Instance;
+
+    private void Start()
+    {
+        Instance = this;
+    }
+
+    public void GetValidMoves(ChessPieceType pieceType, Vector2Int pos, bool isWhite)
     {
         switch (pieceType)
         {
-            case ChessPieceType.Pawn: return PawnMoves(pos, isWhite);
-            case ChessPieceType.Rook: return RookMoves(pos, isWhite);
-            case ChessPieceType.Knight: return KnightMoves(pos, isWhite);
-            case ChessPieceType.Bishop: return BishopMoves(pos, isWhite);
-            case ChessPieceType.Queen: return QueenMoves(pos, isWhite);
-            case ChessPieceType.King: return KingMoves(pos, isWhite);
-            default: return new List<Vector2Int>();
+            case ChessPieceType.Pawn: 
+                PawnMoves(pos, isWhite);
+                break;
+            case ChessPieceType.Rook: 
+                RookMoves(pos, isWhite);
+                break;
+            case ChessPieceType.Knight: 
+                KnightMoves(pos, isWhite);
+                break;
+            case ChessPieceType.Bishop: 
+                BishopMoves(pos, isWhite);
+                break;
+            case ChessPieceType.Queen: 
+                QueenMoves(pos, isWhite);
+                break;
+            case ChessPieceType.King: 
+                KingMoves(pos, isWhite);
+                break;
+            default: new List<Vector2Int>();
+                break;
         }
     }
 
-    private static List<Vector2Int> PawnMoves(Vector2Int pos, bool isWhite)
-    {
-        var moves = new List<Vector2Int>();
-        int dir = isWhite ? -1 : 1;
 
-        int forwardRow = pos.x + dir;
+    #region Movement Logic
+    void PawnMoves(Vector2Int pos, bool isWhite)
+    {
+        int row = pos.x;
         int col = pos.y;
 
-        // Move forward if empty
-        if (InBounds(forwardRow, col))
+        // Up 
+        if (row < 8)
         {
-            var forwardTile = ChessBoardPlacementHandler.Instance.GetTile(forwardRow, col)?.transform;
-            if (forwardTile != null && forwardTile.childCount == 0)
-                moves.Add(new Vector2Int(forwardRow, col));
+            ChessBoardPlacementHandler.Instance.Highlight(row + 1, col);
         }
 
-        // Diagonal captures
-        foreach (int offset in new int[] { -1, 1 })
+        // Sideways only if enemy present
+        Vector2Int[] pawnOffsets = new Vector2Int[]
         {
-            int diagCol = col + offset;
-            if (!InBounds(forwardRow, diagCol)) continue;
-
-            var tile = ChessBoardPlacementHandler.Instance.GetTile(forwardRow, diagCol)?.transform;
-            if (tile != null && tile.childCount > 0)
-            {
-                var other = tile.GetComponentInChildren<ChessPlayerPlacementHandler>();
-                if (other != null && other.isWhite != isWhite)
-                {
-                    other.GetComponent<SpriteRenderer>().color = Color.red;
-                    ChessBoardPlacementHandler.Instance.enemyHighlights.Add(other.transform);
-                }
-            }
-        }
-
-        return moves;
-    }
-
-    private static List<Vector2Int> RookMoves(Vector2Int pos, bool isWhite)
-    {
-        return GetMovesInDirections(pos, isWhite, new Vector2Int[] {
-            new(1, 0), new(-1, 0), new(0, 1), new(0, -1)
-        });
-    }
-
-    private static List<Vector2Int> BishopMoves(Vector2Int pos, bool isWhite)
-    {
-        return GetMovesInDirections(pos, isWhite, new Vector2Int[] {
-            new(1, 1), new(1, -1), new(-1, 1), new(-1, -1)
-        });
-    }
-
-    private static List<Vector2Int> QueenMoves(Vector2Int pos, bool isWhite)
-    {
-        return GetMovesInDirections(pos, isWhite, new Vector2Int[] {
-            new(1, 0), new(-1, 0), new(0, 1), new(0, -1),
-            new(1, 1), new(1, -1), new(-1, 1), new(-1, -1)
-        });
-    }
-
-    private static List<Vector2Int> KnightMoves(Vector2Int pos, bool isWhite)
-    {
-        var moves = new List<Vector2Int>();
-        Vector2Int[] offsets = new Vector2Int[]
-        {
-            new(2, 1), new(2, -1), new(-2, 1), new(-2, -1),
-            new(1, 2), new(1, -2), new(-1, 2), new(-1, -2)
+                new Vector2Int(1, -1), new Vector2Int(1, 1)
         };
 
-        foreach (var offset in offsets)
+        foreach (var offset in pawnOffsets)
         {
-            int r = pos.x + offset.x;
-            int c = pos.y + offset.y;
-            if (!InBounds(r, c)) continue;
+            int r = row + offset.x;
+            int c = col + offset.y;
 
-            var tile = ChessBoardPlacementHandler.Instance.GetTile(r, c)?.transform;
-            if (tile == null) continue;
-
-            if (tile.childCount == 0)
+            if (InBounds(r, c)) // Avoiding edges
             {
-                moves.Add(new Vector2Int(r, c));
-            }
-            else
-            {
-                var other = tile.GetComponentInChildren<ChessPlayerPlacementHandler>();
-                if (other != null && other.isWhite != isWhite)
-                {
-                    other.GetComponent<SpriteRenderer>().color = Color.red;
-                    ChessBoardPlacementHandler.Instance.enemyHighlights.Add(other.transform);
-                }
-            }
-        }
-
-        return moves;
-    }
-
-    private static List<Vector2Int> KingMoves(Vector2Int pos, bool isWhite)
-    {
-        var moves = new List<Vector2Int>();
-        Vector2Int[] offsets = new Vector2Int[]
-        {
-            new(1, 0), new(-1, 0), new(0, 1), new(0, -1),
-            new(1, 1), new(1, -1), new(-1, 1), new(-1, -1)
-        };
-
-        foreach (var offset in offsets)
-        {
-            int r = pos.x + offset.x;
-            int c = pos.y + offset.y;
-            if (!InBounds(r, c)) continue;
-
-            var tile = ChessBoardPlacementHandler.Instance.GetTile(r, c)?.transform;
-            if (tile == null) continue;
-
-            if (tile.childCount == 0)
-            {
-                moves.Add(new Vector2Int(r, c));
-            }
-            else
-            {
-                var other = tile.GetComponentInChildren<ChessPlayerPlacementHandler>();
-                if (other != null && other.isWhite != isWhite)
-                {
-                    other.GetComponent<SpriteRenderer>().color = Color.red;
-                    ChessBoardPlacementHandler.Instance.enemyHighlights.Add(other.transform);
-                }
-            }
-        }
-
-        return moves;
-    }
-
-    private static List<Vector2Int> GetMovesInDirections(Vector2Int pos, bool isWhite, Vector2Int[] directions)
-    {
-        var moves = new List<Vector2Int>();
-
-        foreach (var dir in directions)
-        {
-            for (int i = 1; i < 8; i++)
-            {
-                int r = pos.x + dir.x * i;
-                int c = pos.y + dir.y * i;
-                if (!InBounds(r, c)) break;
-
                 var tile = ChessBoardPlacementHandler.Instance.GetTile(r, c)?.transform;
-                if (tile == null) break;
-
-                if (tile.childCount == 0)
+                if (tile != null && tile.childCount > 0)
                 {
-                    moves.Add(new Vector2Int(r, c));
-                }
-                else
-                {
-                    var other = tile.GetComponentInChildren<ChessPlayerPlacementHandler>();
-                    if (other != null && other.isWhite != isWhite)
+                    var otherPiece = tile.GetComponentInChildren<ChessPlayerPlacementHandler>();
+                    if (otherPiece != null && otherPiece.isWhite != isWhite)
                     {
-                        other.GetComponent<SpriteRenderer>().color = Color.red;
-                        ChessBoardPlacementHandler.Instance.enemyHighlights.Add(other.transform);
+                        otherPiece.GetComponent<SpriteRenderer>().color = Color.red;
+                        ChessBoardPlacementHandler.Instance.enemyHighlights.Add(otherPiece.transform);
                     }
-                    break;
                 }
             }
         }
-
-        return moves;
     }
 
-    private static bool InBounds(int x, int y) => x >= 0 && x < 8 && y >= 0 && y < 8;
+    void RookMoves(Vector2Int pos, bool isWhite)
+    {
+        int row = pos.x;
+        int col = pos.y;
+
+        // Up
+        for (int r = row + 1; r < 8; r++)
+        {
+            if (!TryHighlight(r, col,isWhite)) break;
+        }
+
+        // Down
+        for (int r = row - 1; r >= 0; r--)
+        {
+            if (!TryHighlight(r, col, isWhite)) break;
+        }
+
+        // Right
+        for (int c = col + 1; c < 8; c++)
+        {
+            if (!TryHighlight(row, c, isWhite)) break;
+        }
+
+        // Left
+        for (int c = col - 1; c >= 0; c--)
+        {
+            if (!TryHighlight(row, c, isWhite)) break;
+        }
+    }
+
+    void BishopMoves(Vector2Int pos, bool isWhite)
+    {
+        int row = pos.x;
+        int col = pos.y;
+
+        // Top-Right
+        for (int r = row + 1, c = col + 1; r < 8 && c < 8; r++, c++)
+        {
+            if (!TryHighlight(r, c, isWhite)) break;
+        }
+
+        // Top-Left
+        for (int r = row + 1, c = col - 1; r < 8 && c >= 0; r++, c--)
+        {
+            if (!TryHighlight(r, c, isWhite)) break;
+        }
+
+        // Bottom-Right
+        for (int r = row - 1, c = col + 1; r >= 0 && c < 8; r--, c++)
+        {
+            if (!TryHighlight(r, c, isWhite)) break;
+        }
+
+        // Bottom-Left
+        for (int r = row - 1, c = col - 1; r >= 0 && c >= 0; r--, c--)
+        {
+            if (!TryHighlight(r, c, isWhite)) break;
+        }
+    }
+
+    void KnightMoves(Vector2Int pos, bool isWhite)
+    {
+        int row = pos.x;
+        int col = pos.y;
+
+        Vector2Int[] knightOffsets = new Vector2Int[]
+        {
+                new Vector2Int(2, 1), new Vector2Int(2, -1),
+                new Vector2Int(-2, 1), new Vector2Int(-2, -1),
+                new Vector2Int(1, 2), new Vector2Int(1, -2),
+                new Vector2Int(-1, 2), new Vector2Int(-1, -2)
+        };
+
+        foreach (var offset in knightOffsets)
+        {
+            int r = row + offset.x;
+            int c = col + offset.y;
+            if (InBounds(r, c)) // Avoiding edges
+                TryHighlight(r, c, isWhite);
+        }
+    }
+
+    void QueenMoves(Vector2Int pos, bool isWhite)
+    {
+        RookMoves(pos,isWhite);   // Queen = Rook + Bishop
+        BishopMoves(pos,isWhite);
+    }
+
+    void KingMoves(Vector2Int pos, bool isWhite)
+    {
+        int row = pos.x;
+        int col = pos.y;
+
+        Vector2Int[] kingOffsets = new Vector2Int[]
+        {
+                new Vector2Int(1, -1), new Vector2Int(1, 0), new Vector2Int(1, 1),
+                new Vector2Int(0, -1), new Vector2Int(0, 1),
+                new Vector2Int(-1, -1),new Vector2Int(-1, 0), new Vector2Int(-1, 1)
+        };
+
+        foreach (var offset in kingOffsets)
+        {
+            int r = row + offset.x;
+            int c = col + offset.y;
+            if (InBounds(r,c)) // Avoiding edges
+                TryHighlight(r, c, isWhite);
+        }
+    }
+
+#endregion
+
+
+    bool TryHighlight(int row, int col,bool isWhite)
+    {
+        var tile = ChessBoardPlacementHandler.Instance.GetTile(row, col)?.transform;
+
+        if (tile == null)
+            return false;
+
+        if (tile.childCount > 0)
+        {
+            var otherPiece = tile.GetComponentInChildren<ChessPlayerPlacementHandler>();
+            if (otherPiece != null && otherPiece.isWhite != isWhite)
+            {
+                otherPiece.GetComponent<SpriteRenderer>().color = Color.red;
+                ChessBoardPlacementHandler.Instance.enemyHighlights.Add(otherPiece.transform);
+            }
+            return false; // Occupied — don’t highlight and stop further movement
+        }
+
+        ChessBoardPlacementHandler.Instance.Highlight(row, col);
+        return true; // Continue checking next tile
+    }
+
+    bool InBounds(int r, int c) => r >= 0 && r < 8 && c >= 0 && c < 8;
 }
