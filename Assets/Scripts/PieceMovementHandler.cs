@@ -1,4 +1,4 @@
-using Chess.Scripts.Core;
+﻿using Chess.Scripts.Core;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -13,58 +13,65 @@ public class PieceMovementHandler:MonoBehaviour
         Instance = this;
     }
 
-    public void GetValidMoves(ChessPieceType pieceType, Vector2Int pos, bool isWhite)
+    public void GetValidMoves(ChessPieceType pieceType, Vector2Int pos, ChessPlayerPlacementHandler piece)
     {
+        ChessBoardPlacementHandler.Instance.ClearHighlights(); // Clear previous highlights
+
         switch (pieceType)
         {
-            case ChessPieceType.Pawn: 
-                PawnMoves(pos, isWhite);
-                break;
-            case ChessPieceType.Rook: 
-                RookMoves(pos, isWhite);
-                break;
-            case ChessPieceType.Knight: 
-                KnightMoves(pos, isWhite);
-                break;
-            case ChessPieceType.Bishop: 
-                BishopMoves(pos, isWhite);
-                break;
-            case ChessPieceType.Queen: 
-                QueenMoves(pos, isWhite);
-                break;
-            case ChessPieceType.King: 
-                KingMoves(pos, isWhite);
-                break;
-            default: new List<Vector2Int>();
-                break;
+            case ChessPieceType.Pawn: PawnMoves(pos, piece); break;
+            case ChessPieceType.Rook: RookMoves(pos, piece); break;
+            case ChessPieceType.Knight: KnightMoves(pos, piece); break;
+            case ChessPieceType.Bishop: BishopMoves(pos, piece); break;
+            case ChessPieceType.Queen: QueenMoves(pos, piece); break;
+            case ChessPieceType.King: KingMoves(pos, piece); break;
+            default: Debug.LogWarning("Unknown piece type"); break;
         }
     }
 
-
     #region Movement Logic
-    void PawnMoves(Vector2Int pos, bool isWhite)
+    void PawnMoves(Vector2Int pos, ChessPlayerPlacementHandler piece)
     {
         int row = pos.x;
         int col = pos.y;
+        bool isWhite = piece.isWhite;
 
-        // Up 
-        if (row < 8)
+        int direction = isWhite ? -1 : 1;
+        int startRow = isWhite ? 6 : 1;
+
+        // One step forward
+        int forwardRow = row + direction;
+        if (InBounds(forwardRow, col))
         {
-            ChessBoardPlacementHandler.Instance.Highlight(row + 1, col);
+            var forwardTile = ChessBoardPlacementHandler.Instance.GetTile(forwardRow, col);
+            if (forwardTile != null && forwardTile.transform.childCount == 0)
+            {
+                piece.TryHighlight(forwardRow, col);
+
+                // Two steps forward (only if first move and 1-step is empty)
+                int twoStepRow = row + 2 * direction;
+                var twoStepTile = ChessBoardPlacementHandler.Instance.GetTile(twoStepRow, col);
+                if (row == startRow && InBounds(twoStepRow, col) &&
+                    twoStepTile != null && twoStepTile.transform.childCount == 0)
+                {
+                    piece.TryHighlight(twoStepRow, col);
+                }
+            }
         }
 
-        // Sideways only if enemy present
-        Vector2Int[] pawnOffsets = new Vector2Int[]
+        // Diagonal captures
+        Vector2Int[] diagonalOffsets = new Vector2Int[]
         {
-                new Vector2Int(1, -1), new Vector2Int(1, 1)
+        new Vector2Int(direction, -1),
+        new Vector2Int(direction, 1)
         };
 
-        foreach (var offset in pawnOffsets)
+        foreach (var offset in diagonalOffsets)
         {
             int r = row + offset.x;
             int c = col + offset.y;
 
-            if (InBounds(r, c)) // Avoiding edges
+            if (InBounds(r, c))
             {
                 var tile = ChessBoardPlacementHandler.Instance.GetTile(r, c)?.transform;
                 if (tile != null && tile.childCount > 0)
@@ -80,139 +87,94 @@ public class PieceMovementHandler:MonoBehaviour
         }
     }
 
-    void RookMoves(Vector2Int pos, bool isWhite)
+    void RookMoves(Vector2Int pos, ChessPlayerPlacementHandler piece)
     {
         int row = pos.x;
         int col = pos.y;
 
-        // Up
-        for (int r = row + 1; r < 8; r++)
-        {
-            if (!TryHighlight(r, col,isWhite)) break;
-        }
-
-        // Down
-        for (int r = row - 1; r >= 0; r--)
-        {
-            if (!TryHighlight(r, col, isWhite)) break;
-        }
-
-        // Right
-        for (int c = col + 1; c < 8; c++)
-        {
-            if (!TryHighlight(row, c, isWhite)) break;
-        }
-
-        // Left
-        for (int c = col - 1; c >= 0; c--)
-        {
-            if (!TryHighlight(row, c, isWhite)) break;
-        }
+        for (int r = row + 1; r < 8; r++) if (!piece.TryHighlight(r, col)) break;
+        for (int r = row - 1; r >= 0; r--) if (!piece.TryHighlight(r, col)) break;
+        for (int c = col + 1; c < 8; c++) if (!piece.TryHighlight(row, c)) break;
+        for (int c = col - 1; c >= 0; c--) if (!piece.TryHighlight(row, c)) break;
     }
 
-    void BishopMoves(Vector2Int pos, bool isWhite)
+    void BishopMoves(Vector2Int pos, ChessPlayerPlacementHandler piece)
     {
         int row = pos.x;
         int col = pos.y;
 
-        // Top-Right
+        // Top-Right ↗
         for (int r = row + 1, c = col + 1; r < 8 && c < 8; r++, c++)
-        {
-            if (!TryHighlight(r, c, isWhite)) break;
-        }
+            if (!piece.TryHighlight(r, c)) break;
 
-        // Top-Left
+        // Top-Left ↖
         for (int r = row + 1, c = col - 1; r < 8 && c >= 0; r++, c--)
-        {
-            if (!TryHighlight(r, c, isWhite)) break;
-        }
+            if (!piece.TryHighlight(r, c)) break;
 
-        // Bottom-Right
+        // Bottom-Right ↘
         for (int r = row - 1, c = col + 1; r >= 0 && c < 8; r--, c++)
-        {
-            if (!TryHighlight(r, c, isWhite)) break;
-        }
+            if (!piece.TryHighlight(r, c)) break;
 
-        // Bottom-Left
+        // Bottom-Left ↙
         for (int r = row - 1, c = col - 1; r >= 0 && c >= 0; r--, c--)
-        {
-            if (!TryHighlight(r, c, isWhite)) break;
-        }
+            if (!piece.TryHighlight(r, c)) break;
     }
 
-    void KnightMoves(Vector2Int pos, bool isWhite)
+    void KnightMoves(Vector2Int pos, ChessPlayerPlacementHandler piece)
     {
         int row = pos.x;
         int col = pos.y;
 
         Vector2Int[] knightOffsets = new Vector2Int[]
         {
-                new Vector2Int(2, 1), new Vector2Int(2, -1),
-                new Vector2Int(-2, 1), new Vector2Int(-2, -1),
-                new Vector2Int(1, 2), new Vector2Int(1, -2),
-                new Vector2Int(-1, 2), new Vector2Int(-1, -2)
+        new Vector2Int(2, 1), new Vector2Int(2, -1),
+        new Vector2Int(-2, 1), new Vector2Int(-2, -1),
+        new Vector2Int(1, 2), new Vector2Int(1, -2),
+        new Vector2Int(-1, 2), new Vector2Int(-1, -2)
         };
 
         foreach (var offset in knightOffsets)
         {
             int r = row + offset.x;
             int c = col + offset.y;
-            if (InBounds(r, c)) // Avoiding edges
-                TryHighlight(r, c, isWhite);
+            if (InBounds(r, c))
+            {
+                piece.TryHighlight(r, c);
+            }
         }
     }
 
-    void QueenMoves(Vector2Int pos, bool isWhite)
+    void QueenMoves(Vector2Int pos, ChessPlayerPlacementHandler piece)
     {
-        RookMoves(pos,isWhite);   // Queen = Rook + Bishop
-        BishopMoves(pos,isWhite);
+        RookMoves(pos, piece);   // Straight lines
+        BishopMoves(pos, piece); // Diagonals
     }
 
-    void KingMoves(Vector2Int pos, bool isWhite)
+    void KingMoves(Vector2Int pos, ChessPlayerPlacementHandler piece)
     {
         int row = pos.x;
         int col = pos.y;
 
         Vector2Int[] kingOffsets = new Vector2Int[]
         {
-                new Vector2Int(1, -1), new Vector2Int(1, 0), new Vector2Int(1, 1),
-                new Vector2Int(0, -1), new Vector2Int(0, 1),
-                new Vector2Int(-1, -1),new Vector2Int(-1, 0), new Vector2Int(-1, 1)
+        new Vector2Int(1, -1), new Vector2Int(1, 0), new Vector2Int(1, 1),
+        new Vector2Int(0, -1),                      new Vector2Int(0, 1),
+        new Vector2Int(-1, -1), new Vector2Int(-1, 0), new Vector2Int(-1, 1)
         };
 
         foreach (var offset in kingOffsets)
         {
             int r = row + offset.x;
             int c = col + offset.y;
-            if (InBounds(r,c)) // Avoiding edges
-                TryHighlight(r, c, isWhite);
-        }
-    }
-
-#endregion
-
-
-    bool TryHighlight(int row, int col,bool isWhite)
-    {
-        var tile = ChessBoardPlacementHandler.Instance.GetTile(row, col)?.transform;
-
-        if (tile == null)
-            return false;
-
-        if (tile.childCount > 0)
-        {
-            var otherPiece = tile.GetComponentInChildren<ChessPlayerPlacementHandler>();
-            if (otherPiece != null && otherPiece.isWhite != isWhite)
+            if (InBounds(r, c))
             {
-                otherPiece.GetComponent<SpriteRenderer>().color = Color.red;
-                ChessBoardPlacementHandler.Instance.enemyHighlights.Add(otherPiece.transform);
+                piece.TryHighlight(r, c);
             }
-            return false; // Occupied � don�t highlight and stop further movement
         }
-
-        ChessBoardPlacementHandler.Instance.Highlight(row, col);
-        return true; // Continue checking next tile
     }
+
+    #endregion
+
 
     bool InBounds(int r, int c) => r >= 0 && r < 8 && c >= 0 && c < 8;
 }
