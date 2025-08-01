@@ -37,8 +37,30 @@ namespace Chess.Scripts.Core
 
         public void OnPieceClicked()
         {
-            PieceMovementHandler.Instance.GetValidMoves(piece, currentTileIndex, isWhite);
+            PieceMovementHandler.Instance.GetValidMoves(piece, currentTileIndex, this);
         }
-        
+
+        public bool TryHighlight(int row, int col)
+        {
+            var tile = ChessBoardPlacementHandler.Instance.GetTile(row, col)?.transform;
+
+            if (tile == null) return false;
+
+            if (tile.childCount > 0)
+            {
+                var otherPiece = tile.GetComponentInChildren<ChessPlayerPlacementHandler>();
+                if (otherPiece != null && otherPiece.isWhite != this.isWhite)
+                {
+                    otherPiece.GetComponent<SpriteRenderer>().color = Color.red;
+                    ChessBoardPlacementHandler.Instance.enemyHighlights.Add(otherPiece.transform);
+                }
+                return false; // Blocked by another piece
+            }
+
+            ChessBoardPlacementHandler.Instance.Highlight(row, col);
+            return true;
+        }
+
+
     }
 }
